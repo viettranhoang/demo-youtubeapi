@@ -1,4 +1,4 @@
-package com.vit.demoyoutubeapi;
+package com.vit.demoyoutubeapi.model;
 
 public class VideoYoutube {
     private String title;

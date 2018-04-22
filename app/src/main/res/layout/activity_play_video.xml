@@ -5,14 +5,14 @@
     android:orientation="vertical"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".PlayVideoActivity">
+    tools:context=".activity.PlayVideoActivity">
 
     <com.google.android.youtube.player.YouTubePlayerView
         android:id="@+id/view_youtube"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"/>
 
-    <ListView
+    <android.support.v7.widget.RecyclerView
         android:id="@+id/list_relate_video"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>

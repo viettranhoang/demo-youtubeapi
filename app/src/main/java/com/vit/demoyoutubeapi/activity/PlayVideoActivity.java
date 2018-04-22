@@ -1,13 +1,11 @@
-package com.vit.demoyoutubeapi;
+package com.vit.demoyoutubeapi.activity;
 
-import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.widget.AdapterView;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.Toast;
 
@@ -21,6 +19,10 @@ import com.google.android.youtube.player.YouTubeBaseActivity;
 import com.google.android.youtube.player.YouTubeInitializationResult;
 import com.google.android.youtube.player.YouTubePlayer;
 import com.google.android.youtube.player.YouTubePlayerView;
+import com.vit.demoyoutubeapi.utils.Constants;
+import com.vit.demoyoutubeapi.R;
+import com.vit.demoyoutubeapi.adpater.VideoYoutubeAdapter;
+import com.vit.demoyoutubeapi.model.VideoYoutube;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -30,49 +32,46 @@ import java.util.ArrayList;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
-import butterknife.OnClick;
+import butterknife.OnItemClick;
 
-public class MainActivity extends AppCompatActivity {
+public class PlayVideoActivity extends YouTubeBaseActivity implements YouTubePlayer.OnInitializedListener{
 
-    @BindView(R.id.edit_search) EditText mEditSearch;
-    @BindView(R.id.button_search) Button mButtonSearch;
-    @BindView(R.id.list_video) ListView mListVideo;
+    private String mVideoId;
+    private String mUrlGetJson;
+
+    @BindView(R.id.view_youtube) YouTubePlayerView mViewYoutube;
+    @BindView(R.id.list_relate_video) RecyclerView mListVideo;
 
     private ArrayList<VideoYoutube> mVideoYoutubeList;
     private VideoYoutubeAdapter mVideoYoutubeAdapter;
 
-    private String keyword;
-    private String mUrlGetJson;
+    int REQUEST_VIDEO = 12;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_play_video);
         ButterKnife.bind(this);
 
-        mVideoYoutubeList = new ArrayList<>();
-        mVideoYoutubeAdapter = new VideoYoutubeAdapter(this, R.layout.item_video_youtube, mVideoYoutubeList);
-        mListVideo.setAdapter(mVideoYoutubeAdapter);
+        mVideoId = getIntent().getStringExtra("videoId");
+        mUrlGetJson = "https://www.googleapis.com/youtube/v3/search?part=snippet&relatedToVideoId="
+                + mVideoId +"&type=video&key=" + Constants.API_KEY + "&maxResults=" + Constants.MAX_RESULTS;
 
-        mListVideo.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+        mViewYoutube.initialize(Constants.API_KEY, this);
+
+        mVideoYoutubeList = new ArrayList<>();
+        mVideoYoutubeAdapter = new VideoYoutubeAdapter(mVideoYoutubeList);
+        mListVideo.setAdapter(mVideoYoutubeAdapter);
+        mListVideo.setLayoutManager(new LinearLayoutManager(this));
+
+        mVideoYoutubeAdapter.setOnItemClickListener(new VideoYoutubeAdapter.OnItemClickListener() {
             @Override
-            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                Intent intent = new Intent(MainActivity.this, PlayVideoActivity.class);
+            public void onItemClick(View view, int position) {
+                Intent intent = new Intent(PlayVideoActivity.this, PlayVideoActivity.class);
                 intent.putExtra("videoId", mVideoYoutubeList.get(position).getVideoId());
                 startActivity(intent);
             }
         });
-    }
-
-    @OnClick(R.id.button_search)
-    void onClickSearch(View view) {
-        mVideoYoutubeList.clear();
-        mVideoYoutubeAdapter.notifyDataSetChanged();
-
-        keyword = mEditSearch.getText().toString();
-        keyword = keyword.replace(' ', '+');
-        mUrlGetJson = "https://www.googleapis.com/youtube/v3/search?part=snippet&q="+ keyword +"&type=video&key="
-                + Constant.API_KEY + "&maxResults=" + Constant.MAX_RESULTS;
 
         getJsonYoutube(mUrlGetJson);
     }
@@ -116,11 +115,33 @@ public class MainActivity extends AppCompatActivity {
                 new Response.ErrorListener() {
                     @Override
                     public void onErrorResponse(VolleyError error) {
-                        Toast.makeText(MainActivity.this, "Error", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(PlayVideoActivity.this, "Error", Toast.LENGTH_SHORT).show();
                     }
                 }
         );
         requestQueue.add(jsonObjectRequest);
     }
 
+    @Override
+    public void onInitializationSuccess(YouTubePlayer.Provider provider, YouTubePlayer youTubePlayer, boolean b) {
+        youTubePlayer.loadVideo(mVideoId);
+    }
+
+    @Override
+    public void onInitializationFailure(YouTubePlayer.Provider provider, YouTubeInitializationResult result) {
+        if (result.isUserRecoverableError()) {
+            result.getErrorDialog(PlayVideoActivity.this, REQUEST_VIDEO);
+        } else {
+            Toast.makeText(this, "Error!", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+
+        if (requestCode == REQUEST_VIDEO) {
+            mViewYoutube.initialize(Constants.API_KEY, PlayVideoActivity.this);
+        }
+        super.onActivityResult(requestCode, resultCode, data);
+    }
 }
