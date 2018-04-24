@@ -2,11 +2,14 @@ package com.vit.demoyoutubeapi.activity;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
+import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.android.volley.Request;
@@ -32,9 +35,10 @@ import java.util.ArrayList;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
+import butterknife.OnClick;
 import butterknife.OnItemClick;
 
-public class PlayVideoActivity extends YouTubeBaseActivity implements YouTubePlayer.OnInitializedListener{
+public class PlayVideoActivity extends YouTubeBaseActivity implements YouTubePlayer.OnInitializedListener, View.OnClickListener{
 
     private String mVideoId;
     private String mUrlGetJson;
@@ -46,6 +50,15 @@ public class PlayVideoActivity extends YouTubeBaseActivity implements YouTubePla
     private VideoYoutubeAdapter mVideoYoutubeAdapter;
 
     int REQUEST_VIDEO = 12;
+
+
+    private YouTubePlayer mPlayer;
+
+    @BindView(R.id.video_control) View mPlayButtonLayout;
+    @BindView(R.id.text_play_time) TextView mPlayTimeTextView;
+    @BindView(R.id.seekbar_video) SeekBar mSeekBar;
+    private Handler mHandler = null;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -74,6 +87,9 @@ public class PlayVideoActivity extends YouTubeBaseActivity implements YouTubePla
         });
 
         getJsonYoutube(mUrlGetJson);
+
+        mSeekBar.setOnSeekBarChangeListener(mVideoSeekBarChangeListener);
+        mHandler = new Handler();
     }
 
     private void getJsonYoutube(String url) {
@@ -123,8 +139,25 @@ public class PlayVideoActivity extends YouTubeBaseActivity implements YouTubePla
     }
 
     @Override
-    public void onInitializationSuccess(YouTubePlayer.Provider provider, YouTubePlayer youTubePlayer, boolean b) {
-        youTubePlayer.loadVideo(mVideoId);
+    public void onInitializationSuccess(YouTubePlayer.Provider provider, YouTubePlayer player, boolean wasRestored) {
+//        player.loadVideo(mVideoId);
+
+        if (null == player) return;
+        mPlayer = player;
+
+        displayCurrentTime();
+
+        // Start buffering
+        if (!wasRestored) {
+            player.cueVideo(mVideoId);
+        }
+
+        player.setPlayerStyle(YouTubePlayer.PlayerStyle.CHROMELESS);
+        mPlayButtonLayout.setVisibility(View.VISIBLE);
+
+        // Add listeners to YouTubePlayer instance
+        player.setPlayerStateChangeListener(mPlayerStateChangeListener);
+        player.setPlaybackEventListener(mPlaybackEventListener);
     }
 
     @Override
@@ -144,4 +177,116 @@ public class PlayVideoActivity extends YouTubeBaseActivity implements YouTubePla
         }
         super.onActivityResult(requestCode, resultCode, data);
     }
+
+    @Override
+    public void onClick(View v) {
+
+    }
+
+    @OnClick(R.id.image_play_video)
+    void onClickPlayVideo(View view) {
+        if (null != mPlayer && !mPlayer.isPlaying())
+            mPlayer.play();
+    }
+
+    @OnClick(R.id.image_pause_video)
+    void onClickPauseVideo(View view) {
+        if (null != mPlayer && mPlayer.isPlaying())
+            mPlayer.pause();
+    }
+
+    YouTubePlayer.PlaybackEventListener mPlaybackEventListener = new YouTubePlayer.PlaybackEventListener() {
+        @Override
+        public void onBuffering(boolean arg0) {
+        }
+
+        @Override
+        public void onPaused() {
+            mHandler.removeCallbacks(runnable);
+        }
+
+        @Override
+        public void onPlaying() {
+            mHandler.postDelayed(runnable, 100);
+            displayCurrentTime();
+        }
+
+        @Override
+        public void onSeekTo(int arg0) {
+            mHandler.postDelayed(runnable, 100);
+        }
+
+        @Override
+        public void onStopped() {
+            mHandler.removeCallbacks(runnable);
+        }
+    };
+
+    YouTubePlayer.PlayerStateChangeListener mPlayerStateChangeListener = new YouTubePlayer.PlayerStateChangeListener() {
+        @Override
+        public void onAdStarted() {
+        }
+
+        @Override
+        public void onError(YouTubePlayer.ErrorReason arg0) {
+        }
+
+        @Override
+        public void onLoaded(String arg0) {
+        }
+
+        @Override
+        public void onLoading() {
+        }
+
+        @Override
+        public void onVideoEnded() {
+        }
+
+        @Override
+        public void onVideoStarted() {
+            displayCurrentTime();
+        }
+    };
+
+    SeekBar.OnSeekBarChangeListener mVideoSeekBarChangeListener = new SeekBar.OnSeekBarChangeListener() {
+        @Override
+        public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+            long lengthPlayed = (mPlayer.getDurationMillis() * progress) / 100;
+            mPlayer.seekToMillis((int) lengthPlayed);
+        }
+
+        @Override
+        public void onStartTrackingTouch(SeekBar seekBar) {
+
+        }
+
+        @Override
+        public void onStopTrackingTouch(SeekBar seekBar) {
+
+        }
+    };
+
+    private void displayCurrentTime() {
+        if (null == mPlayer) return;
+        String formattedTime = formatTime(mPlayer.getDurationMillis() - mPlayer.getCurrentTimeMillis());
+        mPlayTimeTextView.setText(formattedTime);
+    }
+
+    private String formatTime(int millis) {
+        int seconds = millis / 1000;
+        int minutes = seconds / 60;
+        int hours = minutes / 60;
+
+        return (hours == 0 ? "--:" : hours + ":") + String.format("%02d:%02d", minutes % 60, seconds % 60);
+    }
+
+
+    private Runnable runnable = new Runnable() {
+        @Override
+        public void run() {
+            displayCurrentTime();
+            mHandler.postDelayed(this, 100);
+        }
+    };
 }
